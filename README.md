@@ -1,6 +1,6 @@
 # Foodzy Restaurant POS
 
-A Flutter demo of the Foodzy cashier experience, built for desktop, web, and tablet layouts. It uses local mock data and does not connect to the Foodzy backend yet.
+A Flutter restaurant POS for desktop, web, and tablet layouts. It connects to the Foodzy REST API for authentication, catalog, tables, orders, kitchen tickets, payment confirmation, customers, reservations, printers, branches, and staff. An offline demo mode remains available for UI review without a backend.
 
 ## Run
 
@@ -17,9 +17,11 @@ The app connects to `http://localhost:8080/api/v1` by default. Override the API 
 flutter run -d windows --dart-define=FOODZY_API_BASE_URL=https://foodzy.cloud/api/v1
 ```
 
-The sign-in screen uses the backend's rotating access/refresh token flow. Tokens are stored with `flutter_secure_storage` (Windows Credential Manager on Windows), refreshed automatically after an authenticated `401`, and removed on sign-out. After login, the menu categories, items, and tables are loaded from the active branch using `X-Branch-ID`. Use **Continue with demo data** when the backend is unavailable or has no demonstration catalog.
+The sign-in screen uses the backend's rotating access/refresh token flow. Tokens are stored with `flutter_secure_storage` (Windows Credential Manager on Windows), refreshed automatically after an authenticated `401`, and removed on sign-out. After login, the active restaurant and branch are loaded from `/auth/me`; subsequent requests include `X-Branch-ID`. Menu categories, items, tables, order types, taxes, orders, KOTs, customers, reservations, printers, receipt settings, branches, and staff are loaded from the live API. Use **Continue with demo data** when the backend is unavailable or for a standalone UI preview.
 
 For Windows, use `flutter run -d windows` on a Windows machine with the Flutter desktop toolchain installed. For a Windows executable, run `flutter build windows` there. You can also run `flutter run -d macos` or `flutter run -d android` on supported hosts.
+
+The **Windows release** GitHub Actions workflow verifies the app and uploads the complete Windows release directory as the `Foodzy-Windows` artifact. Keep the `.exe`, DLLs, and `data` directory together when distributing it.
 
 ## Validate
 
@@ -29,11 +31,17 @@ flutter analyze
 flutter test
 ```
 
+To verify the complete local backend contract against a disposable development database:
+
+```sh
+python3 tool/verify_local_api.py --password '<local seeded password>'
+```
+
 ## Demo workflow
 
 The app opens to Table 08 with a populated order. Search or filter the 60-item menu, customize a dish, and add it to the active table. Identical configurations merge in the cart. The order panel supports notes, quantities, a fixed or percentage discount, a demo coupon (`FOODZY100`), tax calculation, split payment, and checkout. Sending to kitchen creates tickets only for quantities not already sent. Payment creates a receipt in order history and updates the open shift amount. The other navigation areas expose populated demo views.
 
-The active table and draft carts are stored locally with `shared_preferences`. Product data, orders, tables, kitchen tickets, and payment outcomes are mock data or in-memory state. Payment controls simulate a transaction and never charge a real payment method.
+The active table and draft carts are stored locally with `shared_preferences`. In live mode, sending an order to the kitchen creates a backend order and KOT, while checkout records a manually confirmed tender through the backend. The current payment API records cash, card, UPI, bank transfer, or other tender confirmation; it does not initiate an external payment gateway charge. Demo mode continues to use in-memory data.
 
 ## Structure
 
