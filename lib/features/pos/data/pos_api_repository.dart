@@ -98,6 +98,51 @@ class PosApiRepository {
     return _map(await api.post('/pos/orders', body: body));
   }
 
+  Future<List<int>> addOrderItems(int orderId, List<CartLine> lines) async {
+    final additions = [
+      for (final line in lines)
+        if (line.quantity > line.sentQuantity)
+          {
+            'action': 'add',
+            'menu_item_id': _backendId(line.product.id),
+            'quantity': line.quantity - line.sentQuantity,
+            'modifier_ids': [
+              for (final modifier in line.modifiers) _backendId(modifier.id),
+            ],
+            if (line.note.isNotEmpty) 'note': line.note,
+          },
+    ];
+    if (additions.isEmpty) return const [];
+    final response = _map(
+      await api.put('/pos/orders/$orderId/items', body: {'items': additions}),
+    );
+    final data = _map(response['data']);
+    return [
+      for (final id
+          in data['added_items'] is List
+              ? data['added_items'] as List
+              : const [])
+        ?int.tryParse('$id'),
+    ];
+  }
+
+  Future<Map<String, dynamic>> createKot(
+    int orderId,
+    List<int> orderItemIds, {
+    String note = '',
+  }) async => _map(
+    await api.post(
+      '/pos/orders/$orderId/kot',
+      body: {'order_item_ids': orderItemIds, if (note.isNotEmpty) 'note': note},
+    ),
+  );
+
+  Future<Map<String, dynamic>> updateKotStatus(
+    int kotId,
+    String status,
+  ) async =>
+      _map(await api.put('/pos/kots/$kotId/status', body: {'status': status}));
+
   Future<Map<String, dynamic>> payOrder(
     int orderId,
     PaymentMethod method,

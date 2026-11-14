@@ -85,7 +85,14 @@ class OrderSyncController extends Notifier<OrderSyncState> {
 
   Future<int> _ensureOrder(PosState pos, {required bool sendToKitchen}) async {
     final existing = state.orderIds[pos.selectedTable];
-    if (existing != null) return existing;
+    if (existing != null) {
+      final api = ref.read(posApiRepositoryProvider);
+      final addedItemIds = await api.addOrderItems(existing, pos.cart);
+      if (sendToKitchen && addedItemIds.isNotEmpty) {
+        await api.createKot(existing, addedItemIds, note: pos.activeNote);
+      }
+      return existing;
+    }
     final table = pos.selectedTable == 0
         ? null
         : pos.tables

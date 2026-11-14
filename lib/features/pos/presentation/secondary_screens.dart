@@ -213,16 +213,7 @@ class KitchenScreen extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () =>
               ref.read(posDataControllerProvider.notifier).refresh(),
-          child: _LiveRecordList(
-            rows: liveTickets,
-            emptyText: 'No kitchen tickets are pending',
-            title: (row) => _firstText(row, [
-              'kot_number',
-              'token_number',
-              'id',
-            ], prefix: 'KOT '),
-            subtitle: (row) => _firstText(row, ['status', 'order_status']),
-          ),
+          child: _LiveKitchenList(rows: liveTickets),
         ),
       );
     }
@@ -326,6 +317,102 @@ class KitchenScreen extends ConsumerWidget {
     );
   }
 }
+
+class _LiveKitchenList extends ConsumerWidget {
+  const _LiveKitchenList({required this.rows});
+
+  final List<Map<String, dynamic>> rows;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (rows.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 100),
+          Icon(Icons.inbox_outlined, size: 46, color: FoodzyColors.muted),
+          SizedBox(height: 12),
+          Center(
+            child: Text(
+              'No kitchen tickets are pending',
+              style: TextStyle(color: FoodzyColors.muted),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: rows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final row = rows[index];
+        final status = '${row['status'] ?? 'pending_confirmation'}';
+        final nextStatus = switch (status) {
+          'pending_confirmation' => 'in_kitchen',
+          'in_kitchen' => 'food_ready',
+          'food_ready' => 'served',
+          _ => null,
+        };
+        final actionLabel = switch (nextStatus) {
+          'in_kitchen' => 'Start preparing',
+          'food_ready' => 'Mark ready',
+          'served' => 'Mark served',
+          _ => status == 'cancelled' ? 'Cancelled' : 'Completed',
+        };
+        return Card(
+          elevation: 0,
+          child: ListTile(
+            leading: const CircleAvatar(
+              child: Icon(Icons.soup_kitchen_outlined),
+            ),
+            title: Text(
+              _firstText(row, [
+                'kot_number',
+                'token_number',
+                'id',
+              ], prefix: 'KOT '),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(_kitchenStatusLabel(status)),
+            trailing: FilledButton.tonal(
+              onPressed: nextStatus == null
+                  ? null
+                  : () async {
+                      final id = int.tryParse('${row['id']}');
+                      if (id == null) return;
+                      try {
+                        await ref
+                            .read(posApiRepositoryProvider)
+                            .updateKotStatus(id, nextStatus);
+                        await ref
+                            .read(posDataControllerProvider.notifier)
+                            .refresh();
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(error.toString())),
+                          );
+                        }
+                      }
+                    },
+              child: Text(actionLabel),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _kitchenStatusLabel(String status) => switch (status) {
+  'pending_confirmation' => 'Pending confirmation',
+  'in_kitchen' => 'Preparing',
+  'food_ready' => 'Ready for service',
+  'served' => 'Served',
+  'cancelled' => 'Cancelled',
+  _ => status.replaceAll('_', ' '),
+};
 
 class MenuScreen extends ConsumerWidget {
   const MenuScreen({super.key});
